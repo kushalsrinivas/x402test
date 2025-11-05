@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-gray-100 antialiased;
+  }
+
+  ::selection {
+    @apply bg-rose-600/40 text-white;
+  }
+
+  a {
+    @apply text-red-400 transition-colors hover:text-red-300;
+  }
+
+  button {
+    @apply text-white;
+  }
+
+  input, textarea, select {
+    @apply text-white placeholder:text-gray-400 bg-white/10 border-0 outline-none focus:ring-2 focus:ring-red-500/40;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-red-500/50 ring-offset-0;
+  }
+}
