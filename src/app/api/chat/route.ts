@@ -8,6 +8,20 @@ type ChatMessage = {
   content: string;
 };
 
+type GeminiPart = {
+  text?: string;
+};
+
+type GeminiCandidate = {
+  content?: {
+    parts?: GeminiPart[];
+  };
+};
+
+type GeminiResponse = {
+  candidates?: GeminiCandidate[];
+};
+
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -51,10 +65,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = (await geminiResponse.json()) as any;
+    const data = (await geminiResponse.json()) as GeminiResponse;
     const reply =
       data?.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text ?? '')
+        ?.map((p) => p.text ?? '')
         .join('') ?? '';
 
     if (!reply) {
@@ -65,7 +79,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ reply });
-  } catch (err) {
+  } catch (error) {
+    console.error('Chat API error:', error);
     return NextResponse.json(
       { error: 'Unexpected server error' },
       { status: 500 },

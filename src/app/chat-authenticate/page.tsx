@@ -9,12 +9,7 @@ import { X402PaymentClient } from "~/components/X402PaymentClient";
 export default function ChatAuthenticatePage() {
   const router = useRouter();
   const [paymentStatus, setPaymentStatus] = useState<
-    | "idle"
-    | "connecting"
-    | "signing"
-    | "processing"
-    | "success"
-    | "error"
+    "idle" | "connecting" | "signing" | "processing" | "success" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -45,10 +40,10 @@ export default function ChatAuthenticatePage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/20 via-transparent to-transparent"></div>
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
 
-      <div className="container relative z-10 mx-auto max-w-2xl px-4 py-16">
+      <div className="relative z-10 container mx-auto max-w-2xl px-4 py-16">
         <header className="mb-12 text-center">
           <div className="mb-4 inline-block rounded-2xl bg-gradient-to-r from-red-500/10 to-rose-500/10 px-6 py-2 backdrop-blur-sm">
-            <span className="bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-sm font-semibold uppercase tracking-wider text-transparent">
+            <span className="bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-sm font-semibold tracking-wider text-transparent uppercase">
               x402 Payment
             </span>
           </div>
@@ -100,8 +95,7 @@ export default function ChatAuthenticatePage() {
 
                 <div className="text-center">
                   <p className="text-xl font-semibold text-white">
-                    {paymentStatus === "connecting" &&
-                      "Connecting to Wallet"}
+                    {paymentStatus === "connecting" && "Connecting to Wallet"}
                     {paymentStatus === "signing" && "Awaiting Signature"}
                     {paymentStatus === "processing" && "Verifying Payment"}
                     {paymentStatus === "success" && "Payment Confirmed!"}
@@ -139,9 +133,12 @@ export default function ChatAuthenticatePage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-semibold text-yellow-300">⚡ Gasless Transaction</p>
+                      <p className="font-semibold text-yellow-300">
+                        ⚡ Gasless Transaction
+                      </p>
                       <p className="mt-1 text-sm text-yellow-200/80">
-                        You&apos;re signing a payment authorization. No gas fees required—this is powered by ERC-3009!
+                        You&apos;re signing a payment authorization. No gas fees
+                        required—this is powered by ERC-3009!
                       </p>
                     </div>
                   </div>
@@ -165,16 +162,21 @@ export default function ChatAuthenticatePage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-semibold text-emerald-300">✓ Payment Verified</p>
+                      <p className="font-semibold text-emerald-300">
+                        ✓ Payment Verified
+                      </p>
                       <p className="mt-1 text-sm text-emerald-200/80">
-                        Your payment has been confirmed. Redirecting you to Chat...
+                        Your payment has been confirmed. Redirecting you to
+                        Chat...
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <p className="text-center text-sm text-gray-500">Please do not close this window</p>
+              <p className="text-center text-sm text-gray-500">
+                Please do not close this window
+              </p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -202,11 +204,15 @@ export default function ChatAuthenticatePage() {
               </div>
 
               <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
-                <p className="mb-3 font-semibold text-white">Common solutions:</p>
+                <p className="mb-3 font-semibold text-white">
+                  Common solutions:
+                </p>
                 <ul className="space-y-2 text-sm text-gray-400">
                   <li className="flex gap-2">
                     <span className="text-red-400">•</span>
-                    <span>Ensure your wallet is connected and on the right network</span>
+                    <span>
+                      Ensure your wallet is connected and on the right network
+                    </span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-red-400">•</span>
@@ -240,5 +246,3 @@ export default function ChatAuthenticatePage() {
     </main>
   );
 }
-
-

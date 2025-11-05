@@ -70,7 +70,7 @@ export default function ChatPage() {
         <header className="mb-6 flex items-center justify-between">
           <div>
             <div className="mb-2 inline-block rounded-2xl bg-gradient-to-r from-red-500/10 to-rose-500/10 px-4 py-1.5 backdrop-blur-sm">
-              <span className="bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-xs font-semibold uppercase tracking-wider text-transparent">
+              <span className="bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-xs font-semibold tracking-wider text-transparent uppercase">
                 AI Chat (Gated)
               </span>
             </div>
@@ -95,7 +95,7 @@ export default function ChatPage() {
                       : "mr-auto max-w-[80%] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-100"
                   }
                 >
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
                     {m.content}
                   </p>
                 </div>
@@ -129,7 +129,7 @@ export default function ChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
-                className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-400 outline-none transition focus:border-red-500/30"
+                className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-400 transition outline-none focus:border-red-500/30"
               />
               <button
                 onClick={() => void sendMessage()}
@@ -148,5 +148,3 @@ export default function ChatPage() {
     </main>
   );
 }
-
-
