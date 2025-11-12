@@ -106,18 +106,8 @@ export async function POST(request: NextRequest) {
             timestamp: Date.now(),
           };
 
-          // Send pending transaction
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ transaction })}\n\n`
-            )
-          );
-
-          // Wait a bit before requesting signature
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          // Update to signing - tell frontend to process payment
-          transaction.status = "signing";
+          // Send transaction with request for signature
+          // Frontend will handle the actual payment processing and status updates
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ 
@@ -132,33 +122,8 @@ export async function POST(request: NextRequest) {
             )
           );
 
-          // Note: The frontend will handle the actual payment signing and processing
-          // In a real implementation, you'd wait for the frontend to report back
-          // For now, we'll simulate a delay for the signature and processing
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-
-          // Assume success for now (in real implementation, frontend would report back)
-          transaction.status = "processing";
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ transaction })}\n\n`
-            )
-          );
-
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          // Mark as success with mock hash
-          // In real implementation, this would come from X402 facilitator response
-          transaction.status = "success";
-          transaction.txHash = "0x" + Array.from({ length: 64 }, () =>
-            Math.floor(Math.random() * 16).toString(16)
-          ).join("");
-
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ transaction })}\n\n`
-            )
-          );
+          // Small delay before next transaction to avoid overwhelming the user
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
         // Send completion message

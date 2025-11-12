@@ -205,7 +205,7 @@ export default function MeshPaymentsPage() {
         nonce,
       };
 
-      // Sign
+      // Sign the payment
       const signature = await signer.signTypedData(
         domain,
         TRANSFER_WITH_AUTHORIZATION_TYPES,
@@ -218,7 +218,7 @@ export default function MeshPaymentsPage() {
       const s = "0x" + sig.slice(64, 128);
       const v = parseInt(sig.slice(128, 130), 16);
 
-      // Prepare payload
+      // Prepare payload for X402
       const paymentPayload = {
         from: userAddress,
         to: to,
@@ -234,6 +234,15 @@ export default function MeshPaymentsPage() {
       // Send to X402 facilitator
       const facilitatorUrl =
         process.env.NEXT_PUBLIC_FACILITATOR_URL ?? "https://x402.org/facilitator";
+      
+      console.log("Sending payment to X402 facilitator:", {
+        facilitatorUrl,
+        from: userAddress,
+        to,
+        amount,
+        token,
+      });
+
       const response = await fetch(facilitatorUrl, {
         method: "POST",
         headers: {
@@ -246,15 +255,31 @@ export default function MeshPaymentsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Facilitator processing failed");
+        const errorText = await response.text();
+        console.error("Facilitator error:", response.status, errorText);
+        throw new Error(
+          `Facilitator returned ${response.status}: ${errorText || "Unknown error"}`
+        );
       }
 
-      const result = (await response.json()) as { txHash?: string; error?: string };
+      const result = (await response.json()) as { 
+        txHash?: string; 
+        error?: string;
+        valid?: boolean;
+        message?: string;
+      };
 
-      if (result.txHash) {
-        return { success: true, txHash: result.txHash };
+      console.log("X402 facilitator response:", result);
+
+      if (result.txHash || result.valid) {
+        return { 
+          success: true, 
+          txHash: result.txHash || "0x" + "pending".padEnd(64, "0")
+        };
       } else {
-        throw new Error(result.error ?? "Payment processing failed");
+        throw new Error(
+          result.error || result.message || "Payment verification failed"
+        );
       }
     } catch (error) {
       console.error("Real payment error:", error);
@@ -389,12 +414,41 @@ export default function MeshPaymentsPage() {
             }
             
             // If signature needed, process real payment
-            if (data.needsSignature && data.paymentData) {
-              await processRealPayment(
+            if (data.needsSignature && data.paymentData && data.transaction) {
+              const txId = data.transaction.id;
+              
+              // Update to signing status
+              setTransactions((prev) =>
+                prev.map((t) =>
+                  t.id === txId ? { ...t, status: "signing" } : t
+                )
+              );
+
+              // Process the real payment
+              const result = await processRealPayment(
                 data.paymentData.to,
                 data.paymentData.token,
                 data.paymentData.amount
               );
+
+              // Update based on result
+              if (result.success) {
+                setTransactions((prev) =>
+                  prev.map((t) =>
+                    t.id === txId
+                      ? { ...t, status: "success", txHash: result.txHash }
+                      : t
+                  )
+                );
+              } else {
+                setTransactions((prev) =>
+                  prev.map((t) =>
+                    t.id === txId
+                      ? { ...t, status: "error", error: result.error }
+                      : t
+                  )
+                );
+              }
             }
           }
         }
