@@ -237,6 +237,66 @@ export default function Home() {
               </Link>
             </div>
           </div>
+
+          {/* Mesh Payments card */}
+          <div className="group relative mt-8 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800/90 to-slate-900/90 p-8 shadow-2xl backdrop-blur-xl transition-all hover:border-red-500/30 hover:shadow-red-500/10 sm:p-12">
+            <div className="absolute -inset-px rounded-3xl bg-gradient-to-br from-red-500/20 to-rose-500/20 opacity-0 blur-xl transition-opacity group-hover:opacity-100"></div>
+
+            <div className="relative">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-purple-400"></div>
+                <span className="text-sm font-semibold text-purple-300">
+                  Advanced Feature
+                </span>
+              </div>
+
+              <h2 className="mb-4 text-4xl font-bold text-white">
+                Multi-Recipient Distribution
+              </h2>
+              <p className="mb-8 text-xl text-gray-300">
+                Send USDC to multiple wallets with real X402 gasless transactions
+              </p>
+
+              <div className="mb-8 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/5 bg-white/5 p-4 backdrop-blur-sm">
+                  <div className="mb-2 font-semibold text-white">🔀 Random Distribution</div>
+                  <p className="text-sm text-gray-400">
+                    Automatically send random amounts to multiple recipients
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/5 bg-white/5 p-4 backdrop-blur-sm">
+                  <div className="mb-2 font-semibold text-white">⚡ Real Transactions</div>
+                  <p className="text-sm text-gray-400">
+                    Actual blockchain payments via X402 facilitator
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/mesh-payments"
+                className="group/btn relative block w-full overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 to-violet-600 p-[2px] transition-all hover:shadow-2xl hover:shadow-purple-500/50"
+              >
+                <div className="relative flex items-center justify-center gap-3 rounded-[14px] bg-gradient-to-r from-purple-600 to-violet-600 px-8 py-5 transition-all group-hover/btn:from-purple-500 group-hover/btn:to-violet-500">
+                  <span className="text-xl font-bold text-white">
+                    Try Multi-Send Payments
+                  </span>
+                  <svg
+                    className="h-6 w-6 text-white transition-transform group-hover/btn:translate-x-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
 
         <footer className="mt-16 text-center">
