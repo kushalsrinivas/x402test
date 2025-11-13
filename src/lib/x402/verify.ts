@@ -1,10 +1,30 @@
 // x402 Payment Verification
 
-import { verify } from 'x402';
-import { createPublicClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
 import type { PaymentPayload, X402PaymentPayload, PaymentVerificationResult, X402Config } from './types';
 import { logPayment, priceToWei } from './utils';
+
+// Dynamic import for x402 facilitator module
+// The x402 package exports verify and settle functions from 'x402/facilitator'
+type X402VerifyResponse = {
+  isValid: boolean;
+  invalidReason?: string;
+  payer?: string;
+  payee?: string;
+  value?: string;
+  txHash?: string;
+};
+
+type VerifyFunction = (
+  client: any,
+  payload: any,
+  requirements: any,
+  config?: any
+) => Promise<X402VerifyResponse>;
+
+async function getX402Verify(): Promise<VerifyFunction> {
+  const facilitator = await import('x402/facilitator');
+  return facilitator.verify;
+}
 
 /**
  * Check if payload is x402 v1 format
@@ -31,6 +51,10 @@ export async function verifyPaymentWithFacilitator(
       };
     }
 
+    // Import viem dynamically
+    const { createPublicClient, http } = await import('viem');
+    const { baseSepolia } = await import('viem/chains');
+
     // Create viem public client for the network
     const client = createPublicClient({
       chain: baseSepolia, // TODO: Make this dynamic based on config.network
@@ -56,6 +80,7 @@ export async function verifyPaymentWithFacilitator(
     logPayment('Calling x402.verify with requirements', paymentRequirements);
 
     // Use the x402 package's verify function
+    const verify = await getX402Verify();
     const verifyResponse = await verify(
       client,
       payload,
@@ -64,7 +89,7 @@ export async function verifyPaymentWithFacilitator(
 
     logPayment('x402.verify response', verifyResponse);
 
-    if (verifyResponse.valid) {
+    if (verifyResponse.isValid) {
       return {
         valid: true,
         message: 'Payment verified successfully',
@@ -73,7 +98,7 @@ export async function verifyPaymentWithFacilitator(
     } else {
       return {
         valid: false,
-        message: verifyResponse.reason ?? 'Payment verification failed',
+        message: verifyResponse.invalidReason ?? 'Payment verification failed',
       };
     }
   } catch (error) {
