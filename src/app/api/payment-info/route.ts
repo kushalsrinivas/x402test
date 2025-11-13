@@ -8,7 +8,7 @@ import type { NetworkName } from '~/lib/x402';
 export async function GET() {
   const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
   const paymentAmount = process.env.PAYMENT_AMOUNT ?? '$0.10';
-  const network = (process.env.PAYMENT_NETWORK ?? 'avalanche-mainnet') as NetworkName;
+  const network = (process.env.PAYMENT_NETWORK ?? 'base-sepolia') as NetworkName;
   
   const networkConfig = NETWORKS[network];
 
@@ -17,7 +17,7 @@ export async function GET() {
     paymentAmount,
     network,
     networkConfig,
-    facilitatorUrl: process.env.FACILITATOR_URL ?? 'https://x402.0xgasless.com/',
+    facilitatorUrl: process.env.FACILITATOR_URL ?? 'https://x402.org/facilitator',
   });
 }
 

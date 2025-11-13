@@ -1,13 +1,25 @@
 // x402 Payment Protocol Constants
 
 export const NETWORKS = {
+  'base-sepolia': {
+    name: 'Base Sepolia',
+    chainId: 84532,
+    rpcUrl: 'https://sepolia.base.org',
+    usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
+  },
+  'base': {
+    name: 'Base',
+    chainId: 8453,
+    rpcUrl: 'https://mainnet.base.org',
+    usdcAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+  },
   'avalanche-fuji': {
     name: 'Avalanche Fuji',
     chainId: 43113,
     rpcUrl: 'https://api.avax-test.network/ext/bc/C/rpc',
     usdcAddress: '0x5425890298aed601595a70AB815c96711a31Bc65', // USDC on Avalanche Fuji
   },
-  'avalanche-mainnet': {
+  'avalanche': {
     name: 'Avalanche',
     chainId: 43114,
     rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',

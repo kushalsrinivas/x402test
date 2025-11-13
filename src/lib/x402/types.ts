@@ -1,4 +1,5 @@
 // x402 Payment Protocol Types
+// These types match the x402 v1 specification
 
 export interface PaymentDetails {
   maxAmountRequired: string;
@@ -14,7 +15,8 @@ export interface X402Response {
   paymentDetails: PaymentDetails;
 }
 
-export interface PaymentPayload {
+// Legacy PaymentPayload format (old v,r,s format)
+export interface LegacyPaymentPayload {
   from: string;
   to: string;
   value: string;
@@ -25,6 +27,27 @@ export interface PaymentPayload {
   r: string;
   s: string;
 }
+
+// x402 v1 PaymentPayload format (ExactEvmPayload)
+export interface X402PaymentPayload {
+  x402Version: 1;
+  scheme: 'exact';
+  network: string;
+  payload: {
+    signature: string;
+    authorization: {
+      from: string;
+      to: string;
+      value: string;
+      validAfter: string;
+      validBefore: string;
+      nonce: string;
+    };
+  };
+}
+
+// Union type for backwards compatibility
+export type PaymentPayload = X402PaymentPayload | LegacyPaymentPayload;
 
 export interface X402Config {
   walletAddress: string;

@@ -142,23 +142,23 @@ export function X402PaymentClient({
         message
       );
 
-      // Parse signature
-      const sig = signature.slice(2);
-      const r = '0x' + sig.slice(0, 64);
-      const s = '0x' + sig.slice(64, 128);
-      const v = parseInt(sig.slice(128, 130), 16);
-
-      // Prepare payment payload
+      // Prepare payment payload in x402 v1 format
+      // This follows the ExactEvmPayload schema from the x402 package
       const paymentPayload = {
-        from: userAddress,
-        to: walletAddress,
-        value: valueInUSDC.toString(),
-        validAfter,
-        validBefore,
-        nonce,
-        v,
-        r,
-        s,
+        x402Version: 1,
+        scheme: 'exact' as const,
+        network: 'base-sepolia' as const, // Use the correct network identifier
+        payload: {
+          signature: signature, // Full signature string (0x...)
+          authorization: {
+            from: userAddress,
+            to: walletAddress,
+            value: valueInUSDC.toString(),
+            validAfter: validAfter.toString(),
+            validBefore: validBefore.toString(),
+            nonce,
+          },
+        },
       };
 
       onStatusChange('processing');

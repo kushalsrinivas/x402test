@@ -9,7 +9,7 @@ import { x402Middleware } from '~/lib/x402';
 const X402_CONFIG = {
   walletAddress: process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000',
   price: process.env.PAYMENT_AMOUNT ?? '$0.10',
-  network: process.env.PAYMENT_NETWORK ?? 'avalanche-mainnet',
+  network: process.env.PAYMENT_NETWORK ?? 'base-sepolia',
   facilitatorUrl: process.env.FACILITATOR_URL,
 };
 

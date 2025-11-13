@@ -1,51 +1,83 @@
 // x402 Payment Verification
 
-import type { PaymentPayload, PaymentVerificationResult } from './types';
-import { logPayment } from './utils';
+import { verify } from 'x402';
+import { createPublicClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import type { PaymentPayload, X402PaymentPayload, PaymentVerificationResult, X402Config } from './types';
+import { logPayment, priceToWei } from './utils';
 
 /**
- * Verifies a payment payload with the facilitator
+ * Check if payload is x402 v1 format
+ */
+function isX402PaymentPayload(payload: PaymentPayload): payload is X402PaymentPayload {
+  return 'x402Version' in payload && payload.x402Version === 1;
+}
+
+/**
+ * Verifies a payment payload using the x402 package
  */
 export async function verifyPaymentWithFacilitator(
   payload: PaymentPayload,
-  facilitatorUrl: string
+  config: X402Config
 ): Promise<PaymentVerificationResult> {
   try {
-    logPayment('Verifying payment with facilitator', { facilitatorUrl, payload });
+    logPayment('Verifying payment with x402 package', { payload, config });
 
-    const response = await fetch(facilitatorUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        type: 'verifyPayment',
-        payload,
-      }),
-    });
-
-    if (!response.ok) {
+    // Ensure we have x402 v1 format
+    if (!isX402PaymentPayload(payload)) {
       return {
         valid: false,
-        message: `Facilitator verification failed: ${response.statusText}`,
+        message: 'Invalid payment payload format. Expected x402 v1 format.',
       };
     }
 
-    const result = await response.json() as {
-      valid?: boolean;
-      message?: string;
-      txHash?: string;
-    };
-    
-    logPayment('Facilitator verification result', result);
+    // Create viem public client for the network
+    const client = createPublicClient({
+      chain: baseSepolia, // TODO: Make this dynamic based on config.network
+      transport: http(),
+    });
 
-    return {
-      valid: result.valid === true,
-      message: result.message,
-      txHash: result.txHash,
+    // Convert price to wei (USDC has 6 decimals)
+    const maxAmountRequired = priceToWei(config.price);
+
+    // Build payment requirements matching x402 spec
+    const paymentRequirements = {
+      scheme: 'exact' as const,
+      network: payload.network,
+      maxAmountRequired: maxAmountRequired.toString(),
+      resource: '/api/authenticate',
+      description: 'Payment required for access',
+      mimeType: 'application/json',
+      payTo: config.walletAddress,
+      maxTimeoutSeconds: 3600,
+      asset: getUSDCAddress(payload.network),
     };
+
+    logPayment('Calling x402.verify with requirements', paymentRequirements);
+
+    // Use the x402 package's verify function
+    const verifyResponse = await verify(
+      client,
+      payload,
+      paymentRequirements
+    );
+
+    logPayment('x402.verify response', verifyResponse);
+
+    if (verifyResponse.valid) {
+      return {
+        valid: true,
+        message: 'Payment verified successfully',
+        txHash: verifyResponse.txHash,
+      };
+    } else {
+      return {
+        valid: false,
+        message: verifyResponse.reason ?? 'Payment verification failed',
+      };
+    }
   } catch (error) {
-    console.error('Error verifying payment with facilitator:', error);
+    console.error('Error verifying payment with x402:', error);
     return {
       valid: false,
       message: error instanceof Error ? error.message : 'Unknown verification error',
@@ -54,18 +86,57 @@ export async function verifyPaymentWithFacilitator(
 }
 
 /**
+ * Get USDC address for the network
+ */
+function getUSDCAddress(network: string): string {
+  const usdcAddresses: Record<string, string> = {
+    'base-sepolia': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    'base': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    'avalanche-fuji': '0x5425890298aed601595a70AB815c96711a31Bc65',
+    'avalanche': '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+  };
+  return usdcAddresses[network] ?? usdcAddresses['base-sepolia']!;
+}
+
+/**
  * Basic validation of payment payload structure
  */
 export function validatePaymentPayload(payload: PaymentPayload): boolean {
+  // Check if it's x402 v1 format
+  if ('x402Version' in payload) {
+    return !!(
+      payload.x402Version === 1 &&
+      payload.scheme === 'exact' &&
+      payload.network &&
+      payload.payload?.signature &&
+      payload.payload?.authorization?.from &&
+      payload.payload?.authorization?.to &&
+      payload.payload?.authorization?.value &&
+      payload.payload?.authorization?.nonce &&
+      payload.payload?.authorization?.validAfter &&
+      payload.payload?.authorization?.validBefore
+    );
+  }
+  
+  // Legacy format validation (backwards compatibility)
   return !!(
+    'from' in payload &&
     payload.from &&
+    'to' in payload &&
     payload.to &&
+    'value' in payload &&
     payload.value &&
+    'nonce' in payload &&
     payload.nonce &&
+    'validAfter' in payload &&
     typeof payload.validAfter === 'number' &&
+    'validBefore' in payload &&
     typeof payload.validBefore === 'number' &&
+    'v' in payload &&
     typeof payload.v === 'number' &&
+    'r' in payload &&
     payload.r &&
+    's' in payload &&
     payload.s
   );
 }
@@ -74,10 +145,19 @@ export function validatePaymentPayload(payload: PaymentPayload): boolean {
  * Checks if payment amount is sufficient
  */
 export function isPaymentAmountSufficient(
-  paymentValue: string,
+  payload: PaymentPayload,
   requiredValue: bigint
 ): boolean {
   try {
+    let paymentValue: string;
+    
+    // Extract value based on payload format
+    if ('x402Version' in payload) {
+      paymentValue = payload.payload.authorization.value;
+    } else {
+      paymentValue = payload.value;
+    }
+    
     const paymentAmount = BigInt(paymentValue);
     return paymentAmount >= requiredValue;
   } catch {
@@ -89,10 +169,25 @@ export function isPaymentAmountSufficient(
  * Checks if payment is within valid time window
  */
 export function isPaymentTimeValid(
-  validAfter: number,
-  validBefore: number
+  payload: PaymentPayload
 ): boolean {
-  const now = Math.floor(Date.now() / 1000);
-  return now >= validAfter && now <= validBefore;
+  try {
+    let validAfter: number;
+    let validBefore: number;
+    
+    // Extract time values based on payload format
+    if ('x402Version' in payload) {
+      validAfter = parseInt(payload.payload.authorization.validAfter);
+      validBefore = parseInt(payload.payload.authorization.validBefore);
+    } else {
+      validAfter = payload.validAfter;
+      validBefore = payload.validBefore;
+    }
+    
+    const now = Math.floor(Date.now() / 1000);
+    return now >= validAfter && now <= validBefore;
+  } catch {
+    return false;
+  }
 }
 

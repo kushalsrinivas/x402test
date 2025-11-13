@@ -51,9 +51,8 @@ export async function x402Middleware(
 
   // Check payment amount
   const requiredAmount = priceToWei(config.price);
-  if (!isPaymentAmountSufficient(paymentPayload.value, requiredAmount)) {
+  if (!isPaymentAmountSufficient(paymentPayload, requiredAmount)) {
     logPayment('Insufficient payment amount', {
-      received: paymentPayload.value,
       required: requiredAmount.toString(),
     });
     return NextResponse.json(
@@ -63,7 +62,7 @@ export async function x402Middleware(
   }
 
   // Check payment time validity
-  if (!isPaymentTimeValid(paymentPayload.validAfter, paymentPayload.validBefore)) {
+  if (!isPaymentTimeValid(paymentPayload)) {
     logPayment('Payment time window invalid');
     return NextResponse.json(
       { error: 'Payment has expired or is not yet valid' },
@@ -71,11 +70,10 @@ export async function x402Middleware(
     );
   }
 
-  // Verify payment with facilitator
-  const facilitatorUrl = config.facilitatorUrl ?? DEFAULT_FACILITATOR_URL;
+  // Verify payment with x402 package
   const verificationResult = await verifyPaymentWithFacilitator(
     paymentPayload,
-    facilitatorUrl
+    config
   );
 
   if (!verificationResult.valid) {
