@@ -5,6 +5,8 @@ import { logPayment, priceToWei } from './utils';
 
 // Dynamic import for x402 facilitator module
 // The x402 package exports verify and settle functions from 'x402/facilitator'
+
+// x402 verify response type
 type X402VerifyResponse = {
   isValid: boolean;
   invalidReason?: string;
@@ -14,16 +16,41 @@ type X402VerifyResponse = {
   txHash?: string;
 };
 
+// Viem client type (simplified for x402 compatibility)
+type ViemClient = {
+  chain?: unknown;
+  transport?: unknown;
+  [key: string]: unknown;
+};
+
+// x402 payment requirements type
+type X402PaymentRequirements = {
+  scheme: 'exact';
+  network: string;
+  maxAmountRequired: string;
+  resource: string;
+  description: string;
+  mimeType: string;
+  payTo: string;
+  maxTimeoutSeconds: number;
+  asset: string;
+};
+
+// x402 config type
+type X402VerifyConfig = {
+  [key: string]: unknown;
+};
+
 type VerifyFunction = (
-  client: any,
-  payload: any,
-  requirements: any,
-  config?: any
+  client: ViemClient,
+  payload: X402PaymentPayload,
+  requirements: X402PaymentRequirements,
+  config?: X402VerifyConfig
 ) => Promise<X402VerifyResponse>;
 
 async function getX402Verify(): Promise<VerifyFunction> {
   const facilitator = await import('x402/facilitator');
-  return facilitator.verify;
+  return facilitator.verify as VerifyFunction;
 }
 
 /**
