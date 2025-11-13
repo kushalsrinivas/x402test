@@ -1,7 +1,8 @@
 // API Route: /api/process-x402-payment
 // Server-side proxy for X402 facilitator to avoid CORS issues
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 interface PaymentPayload {
   from: string;
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     const { payload } = body;
 
     // Validate payload
-    if (!payload || !payload.from || !payload.to || !payload.value) {
+    if (!payload?.from || !payload?.to || !payload?.value) {
       return NextResponse.json(
         { error: "Invalid payment payload" },
         { status: 400 }
@@ -73,9 +74,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Try to parse as JSON
-    let result;
+    let result: unknown;
     try {
-      result = JSON.parse(responseText);
+      result = JSON.parse(responseText) as unknown;
     } catch (e) {
       console.error("Failed to parse facilitator response as JSON:", e);
       return NextResponse.json(
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Return the facilitator's response
-    return NextResponse.json(result);
+    return NextResponse.json(result as Record<string, unknown>);
   } catch (error) {
     console.error("Payment processing error:", error);
     return NextResponse.json(
