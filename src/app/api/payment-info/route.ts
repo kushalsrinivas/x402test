@@ -17,7 +17,7 @@ export async function GET() {
     paymentAmount,
     network,
     networkConfig,
-    facilitatorUrl: process.env.FACILITATOR_URL ?? 'https://x402.org/facilitator',
+    facilitatorUrl: process.env.FACILITATOR_URL ?? 'https://x402.0xgasless.com/',
   });
 }
 

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Get facilitator URL from environment or use default
     const facilitatorUrl =
-      process.env.NEXT_PUBLIC_FACILITATOR_URL ?? "https://x402.org/facilitator";
+      process.env.NEXT_PUBLIC_FACILITATOR_URL ?? "https://x402.0xgasless.com/";
 
     console.log("Proxying payment to X402 facilitator:", {
       facilitatorUrl,
