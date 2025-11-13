@@ -43,7 +43,7 @@ interface MeshPaymentProcessorProps {
 export function MeshPaymentProcessor({
   fromAddress,
   toAddress,
-  token,
+  token: _token,
   amount,
   networkConfig,
   onSuccess,

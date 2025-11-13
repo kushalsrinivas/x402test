@@ -75,7 +75,7 @@ export function X402PaymentClient({
       const { walletAddress, paymentAmount, networkConfig } = paymentInfo;
 
       // Validate network configuration
-      if (!networkConfig || !networkConfig.chainId) {
+      if (!networkConfig?.chainId) {
         throw new Error('Invalid network configuration received from server. Please check your environment variables.');
       }
 

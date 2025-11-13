@@ -15,7 +15,6 @@ import {
   isPaymentAmountSufficient,
   isPaymentTimeValid,
 } from './verify';
-import { DEFAULT_FACILITATOR_URL } from './constants';
 
 /**
  * x402 Payment Middleware
