@@ -1,95 +1,134 @@
 // API Route: /api/process-x402-payment
-// Server-side proxy for X402 facilitator to avoid CORS issues
+// Processes x402 payment using the official x402 package
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-interface PaymentPayload {
-  from: string;
-  to: string;
-  value: string;
-  validAfter: number;
-  validBefore: number;
-  nonce: string;
-  v: number;
-  r: string;
-  s: string;
+// Supported x402 networks (matches x402 package's Network type)
+type X402Network = 
+  | 'base-sepolia' 
+  | 'base' 
+  | 'avalanche-fuji' 
+  | 'avalanche' 
+  | 'abstract' 
+  | 'abstract-testnet' 
+  | 'sei' 
+  | 'sei-testnet' 
+  | 'polygon' 
+  | 'polygon-amoy' 
+  | 'peaq' 
+  | 'iotex' 
+  | 'solana-devnet' 
+  | 'solana';
+
+// x402 v1 Payment Payload format
+interface X402PaymentPayload {
+  x402Version: 1;
+  scheme: 'exact';
+  network: X402Network;
+  payload: {
+    signature: string;
+    authorization: {
+      from: string;
+      to: string;
+      value: string;
+      validAfter: string;
+      validBefore: string;
+      nonce: string;
+    };
+  };
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
-      payload: PaymentPayload;
+      payload: X402PaymentPayload;
+      paymentRequirements: {
+        scheme: 'exact';
+        network: X402Network;
+        maxAmountRequired: string;
+        resource: string;
+        description: string;
+        mimeType: string;
+        payTo: string;
+        maxTimeoutSeconds: number;
+        asset: string;
+      };
     };
 
-    const { payload } = body;
+    const { payload, paymentRequirements } = body;
 
-    // Validate payload
-    if (!payload?.from || !payload?.to || !payload?.value) {
+    // Validate x402 v1 payload structure
+    if (!payload?.x402Version || payload.x402Version !== 1) {
       return NextResponse.json(
-        { error: "Invalid payment payload" },
+        { error: "Invalid payment payload: x402Version must be 1" },
         { status: 400 }
       );
     }
 
-    // Get facilitator URL from environment or use default
-    const facilitatorUrl =
-      process.env.NEXT_PUBLIC_FACILITATOR_URL ?? "https://x402.0xgasless.com/";
-
-    console.log("Proxying payment to X402 facilitator:", {
-      facilitatorUrl,
-      from: payload.from,
-      to: payload.to,
-      value: payload.value,
-    });
-
-    // Make server-side request to X402 facilitator
-    const response = await fetch(facilitatorUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "processPayment",
-        payload: payload,
-      }),
-    });
-
-    // Get response body
-    const responseText = await response.text();
-    
-    console.log("X402 facilitator response:", {
-      status: response.status,
-      body: responseText.slice(0, 200), // Log first 200 chars
-    });
-
-    if (!response.ok) {
-      console.error("Facilitator error:", response.status, responseText);
+    if (!payload.payload?.signature || !payload.payload?.authorization) {
       return NextResponse.json(
-        {
-          error: `Facilitator returned ${response.status}: ${responseText || "Unknown error"}`,
-        },
-        { status: response.status }
+        { error: "Invalid payment payload: missing signature or authorization" },
+        { status: 400 }
       );
     }
 
-    // Try to parse as JSON
-    let result: unknown;
-    try {
-      result = JSON.parse(responseText) as unknown;
-    } catch (e) {
-      console.error("Failed to parse facilitator response as JSON:", e);
+    const auth = payload.payload.authorization;
+    if (!auth.from || !auth.to || !auth.value) {
       return NextResponse.json(
-        {
-          error: "Invalid response from facilitator",
-          details: responseText.slice(0, 100),
-        },
-        { status: 502 }
+        { error: "Invalid payment payload: missing required authorization fields" },
+        { status: 400 }
       );
     }
 
-    // Return the facilitator's response
-    return NextResponse.json(result as Record<string, unknown>);
+    console.log("Processing x402 payment:", {
+      from: auth.from,
+      to: auth.to,
+      value: auth.value,
+      network: payload.network,
+    });
+
+    // Import x402 verify function and viem dynamically
+    const { verify } = await import('x402/facilitator');
+    const { createPublicClient, http } = await import('viem');
+    const { avalanche } = await import('viem/chains');
+
+    // Create viem client for Avalanche C-Chain
+    const client = createPublicClient({
+      chain: avalanche,
+      transport: http('https://api.avax.network/ext/bc/C/rpc'),
+    });
+
+    // Verify the payment using x402 package
+    const verifyResponse = await verify(
+
+      client,
+      payload,
+      paymentRequirements
+    );
+
+    console.log("x402 verify response:", {
+      isValid: verifyResponse.isValid,
+      invalidReason: verifyResponse.invalidReason,
+      payer: verifyResponse.payer,
+    });
+
+    if (!verifyResponse.isValid) {
+      return NextResponse.json(
+        {
+          error: "Payment verification failed",
+          reason: verifyResponse.invalidReason ?? "Unknown verification error",
+        },
+        { status: 402 }
+      );
+    }
+
+    // Payment verified successfully
+    return NextResponse.json({
+      success: true,
+      isValid: verifyResponse.isValid,
+      payer: verifyResponse.payer,
+    });
   } catch (error) {
     console.error("Payment processing error:", error);
     return NextResponse.json(

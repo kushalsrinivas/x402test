@@ -1,26 +1,26 @@
 // Mesh Payment Processor Component
 // Handles actual wallet connections and X402 payments for mesh distribution
 
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { BrowserProvider } from 'ethers';
+import { useEffect, useRef } from "react";
+import { BrowserProvider } from "ethers";
 
 // EIP-712 Domain for USDC
 const EIP712_DOMAIN = {
-  name: 'USD Coin',
-  version: '2',
+  name: "USD Coin",
+  version: "2",
 };
 
 // EIP-712 Types for TransferWithAuthorization
 const TRANSFER_WITH_AUTHORIZATION_TYPES = {
   TransferWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
+    { name: "from", type: "address" },
+    { name: "to", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "validAfter", type: "uint256" },
+    { name: "validBefore", type: "uint256" },
+    { name: "nonce", type: "bytes32" },
   ],
 };
 
@@ -63,20 +63,22 @@ export function MeshPaymentProcessor({
   async function processPayment() {
     try {
       // Check if MetaMask is installed
-      if (typeof window.ethereum === 'undefined') {
-        onError('MetaMask is not installed');
+      if (typeof window.ethereum === "undefined") {
+        onError("MetaMask is not installed");
         return;
       }
 
       // Connect to wallet
       const provider = new BrowserProvider(window.ethereum);
-      await provider.send('eth_requestAccounts', []);
+      await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       const userAddress = await signer.getAddress();
 
       // Verify the connected wallet matches the sender
       if (userAddress.toLowerCase() !== fromAddress.toLowerCase()) {
-        onError(`Wrong wallet connected. Expected ${fromAddress}, got ${userAddress}`);
+        onError(
+          `Wrong wallet connected. Expected ${fromAddress}, got ${userAddress}`,
+        );
         return;
       }
 
@@ -84,12 +86,12 @@ export function MeshPaymentProcessor({
       const network = await provider.getNetwork();
       if (network.chainId !== BigInt(networkConfig.chainId)) {
         try {
-          await provider.send('wallet_switchEthereumChain', [
+          await provider.send("wallet_switchEthereumChain", [
             { chainId: `0x${networkConfig.chainId.toString(16)}` },
           ]);
         } catch (switchError: unknown) {
           if ((switchError as { code?: number })?.code === 4902) {
-            await provider.send('wallet_addEthereumChain', [
+            await provider.send("wallet_addEthereumChain", [
               {
                 chainId: `0x${networkConfig.chainId.toString(16)}`,
                 chainName: networkConfig.name,
@@ -112,7 +114,11 @@ export function MeshPaymentProcessor({
       // Generate random nonce
       const nonceBuffer = new Uint8Array(32);
       crypto.getRandomValues(nonceBuffer);
-      const nonce = '0x' + Array.from(nonceBuffer).map(b => b.toString(16).padStart(2, '0')).join('');
+      const nonce =
+        "0x" +
+        Array.from(nonceBuffer)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
 
       // Create EIP-712 message
       const domain = {
@@ -136,56 +142,72 @@ export function MeshPaymentProcessor({
       const signature = await signer.signTypedData(
         domain,
         TRANSFER_WITH_AUTHORIZATION_TYPES,
-        message
+        message,
       );
 
-      // Parse signature
-      const sig = signature.slice(2);
-      const r = '0x' + sig.slice(0, 64);
-      const s = '0x' + sig.slice(64, 128);
-      const v = parseInt(sig.slice(128, 130), 16);
-
-      // Prepare payment payload
+      // Prepare payment payload in x402 v1 format
       const paymentPayload = {
-        from: fromAddress,
-        to: toAddress,
-        value: valueInUSDC.toString(),
-        validAfter,
-        validBefore,
-        nonce,
-        v,
-        r,
-        s,
+        x402Version: 1 as const,
+        scheme: "exact" as const,
+        network: "avalanche", // Using Avalanche mainnet with 0xGasless facilitator
+        payload: {
+          signature: signature, // Full signature string
+          authorization: {
+            from: fromAddress,
+            to: toAddress,
+            value: valueInUSDC.toString(),
+            validAfter: validAfter.toString(),
+            validBefore: validBefore.toString(),
+            nonce,
+          },
+        },
       };
 
-      // Send to X402 facilitator via our proxy endpoint (avoids CORS issues)
-      const response = await fetch('/api/process-x402-payment', {
-        method: 'POST',
+      // Prepare payment requirements for verification
+      const paymentRequirements = {
+        scheme: "exact" as const,
+        network: "avalanche",
+        maxAmountRequired: valueInUSDC.toString(),
+        resource: "/api/mesh-distribute",
+        description: "Mesh payment distribution",
+        mimeType: "application/json",
+        payTo: toAddress,
+        maxTimeoutSeconds: 3600,
+        asset: networkConfig.usdcAddress,
+      };
+
+      // Send to X402 payment processor
+      const response = await fetch("/api/process-x402-payment", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           payload: paymentPayload,
+          paymentRequirements: paymentRequirements,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Facilitator processing failed');
+        throw new Error("Facilitator processing failed");
       }
 
-      const result = await response.json() as { txHash?: string; error?: string };
-      
+      const result = (await response.json()) as {
+        txHash?: string;
+        error?: string;
+      };
+
       if (result.txHash) {
         onSuccess(result.txHash);
       } else {
-        throw new Error(result.error ?? 'Payment processing failed');
+        throw new Error(result.error ?? "Payment processing failed");
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error("Payment error:", error);
       if (error instanceof Error) {
         onError(error.message);
       } else {
-        onError('Unknown error during payment');
+        onError("Unknown error during payment");
       }
     }
   }
@@ -197,9 +219,11 @@ export function MeshPaymentProcessor({
 declare global {
   interface Window {
     ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      request: (args: {
+        method: string;
+        params?: unknown[];
+      }) => Promise<unknown>;
       isMetaMask?: boolean;
     };
   }
 }
-

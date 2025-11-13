@@ -35,7 +35,9 @@ export const NETWORKS = {
 
 export type NetworkName = keyof typeof NETWORKS;
 
-export const DEFAULT_FACILITATOR_URL = 'https://x402.org/facilitator';
+// Default facilitators by use case
+export const DEFAULT_FACILITATOR_URL = 'https://x402.org/facilitator'; // Coinbase facilitator for Base
+export const AVALANCHE_FACILITATOR_URL = 'https://x402.0xgasless.com/'; // 0xGasless facilitator for Avalanche
 
 export const PAYMENT_HEADERS = {
   PAYMENT: 'X-PAYMENT',

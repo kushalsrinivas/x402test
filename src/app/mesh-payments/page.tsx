@@ -41,15 +41,15 @@ export default function MeshPaymentsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   // Available tokens
-  const availableTokens: Token[] = [
-    { symbol: "USDC", name: "USD Coin" },
-  ];
+  const availableTokens: Token[] = [{ symbol: "USDC", name: "USD Coin" }];
 
   const connectWallet = async () => {
     setIsConnecting(true);
     try {
       if (typeof window.ethereum === "undefined") {
-        alert("MetaMask is not installed. Please install MetaMask to continue.");
+        alert(
+          "MetaMask is not installed. Please install MetaMask to continue.",
+        );
         return;
       }
 
@@ -60,7 +60,9 @@ export default function MeshPaymentsPage() {
       setConnectedWallet(address);
     } catch (error) {
       console.error("Wallet connection error:", error);
-      alert(error instanceof Error ? error.message : "Failed to connect wallet");
+      alert(
+        error instanceof Error ? error.message : "Failed to connect wallet",
+      );
     } finally {
       setIsConnecting(false);
     }
@@ -81,9 +83,7 @@ export default function MeshPaymentsPage() {
   };
 
   const updateRecipientAddress = (id: string, address: string) => {
-    setRecipients(
-      recipients.map((r) => (r.id === id ? { ...r, address } : r))
-    );
+    setRecipients(recipients.map((r) => (r.id === id ? { ...r, address } : r)));
   };
 
   const toggleToken = (symbol: string) => {
@@ -116,15 +116,15 @@ export default function MeshPaymentsPage() {
   async function processRealPayment(
     to: string,
     token: string,
-    amount: string
+    amount: string,
   ): Promise<{ success: boolean; txHash?: string; error?: string }> {
     try {
       if (typeof window.ethereum === "undefined") {
         throw new Error("MetaMask not installed");
       }
 
-      // Get payment info from server
-      const paymentInfoResponse = await fetch("/api/payment-info");
+      // Get payment info from server (using Avalanche-specific endpoint)
+      const paymentInfoResponse = await fetch("/api/mesh-payment-info");
       if (!paymentInfoResponse.ok) {
         throw new Error("Failed to fetch payment configuration");
       }
@@ -209,30 +209,42 @@ export default function MeshPaymentsPage() {
       const signature = await signer.signTypedData(
         domain,
         TRANSFER_WITH_AUTHORIZATION_TYPES,
-        message
+        message,
       );
 
-      // Parse signature
-      const sig = signature.slice(2);
-      const r = "0x" + sig.slice(0, 64);
-      const s = "0x" + sig.slice(64, 128);
-      const v = parseInt(sig.slice(128, 130), 16);
-
-      // Prepare payload for X402
+      // Prepare payload for x402 v1 format
       const paymentPayload = {
-        from: userAddress,
-        to: to,
-        value: valueInUSDC.toString(),
-        validAfter,
-        validBefore,
-        nonce,
-        v,
-        r,
-        s,
+        x402Version: 1 as const,
+        scheme: "exact" as const,
+        network: "avalanche", // Using Avalanche mainnet with 0xGasless facilitator
+        payload: {
+          signature: signature, // Full signature string
+          authorization: {
+            from: userAddress,
+            to: to,
+            value: valueInUSDC.toString(),
+            validAfter: validAfter.toString(),
+            validBefore: validBefore.toString(),
+            nonce,
+          },
+        },
       };
 
-      // Send to X402 facilitator via our proxy endpoint (avoids CORS issues)
-      console.log("Sending payment to X402 facilitator:", {
+      // Prepare payment requirements
+      const paymentRequirements = {
+        scheme: "exact" as const,
+        network: "avalanche",
+        maxAmountRequired: valueInUSDC.toString(),
+        resource: "/api/mesh-distribute",
+        description: "Mesh payment distribution",
+        mimeType: "application/json",
+        payTo: to,
+        maxTimeoutSeconds: 3600,
+        asset: networkConfig.usdcAddress,
+      };
+
+      // Send to X402 payment processor
+      console.log("Sending payment to x402 processor:", {
         from: userAddress,
         to,
         amount,
@@ -246,6 +258,7 @@ export default function MeshPaymentsPage() {
         },
         body: JSON.stringify({
           payload: paymentPayload,
+          paymentRequirements: paymentRequirements,
         }),
       });
 
@@ -253,12 +266,12 @@ export default function MeshPaymentsPage() {
         const errorText = await response.text();
         console.error("Facilitator error:", response.status, errorText);
         throw new Error(
-          `Facilitator returned ${response.status}: ${errorText || "Unknown error"}`
+          `Facilitator returned ${response.status}: ${errorText || "Unknown error"}`,
         );
       }
 
-      const result = (await response.json()) as { 
-        txHash?: string; 
+      const result = (await response.json()) as {
+        txHash?: string;
         error?: string;
         valid?: boolean;
         message?: string;
@@ -267,13 +280,13 @@ export default function MeshPaymentsPage() {
       console.log("X402 facilitator response:", result);
 
       if (result.txHash ?? result.valid) {
-        return { 
-          success: true, 
-          txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0")
+        return {
+          success: true,
+          txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0"),
         };
       } else {
         throw new Error(
-          result.error ?? result.message ?? "Payment verification failed"
+          result.error ?? result.message ?? "Payment verification failed",
         );
       }
     } catch (error) {
@@ -300,20 +313,26 @@ export default function MeshPaymentsPage() {
     // Validate recipient addresses
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
     const invalidRecipients = recipients.filter(
-      (r) => !ethAddressRegex.exec(r.address)
+      (r) => !ethAddressRegex.exec(r.address),
     );
     if (invalidRecipients.length > 0) {
       return "All recipient addresses must be valid Ethereum addresses";
     }
 
     // Check for duplicate recipients
-    const uniqueAddresses = new Set(recipients.map((r) => r.address.toLowerCase()));
+    const uniqueAddresses = new Set(
+      recipients.map((r) => r.address.toLowerCase()),
+    );
     if (uniqueAddresses.size !== recipients.length) {
       return "Recipient addresses must be unique";
     }
 
     // Check sender is not in recipients
-    if (recipients.some((r) => r.address.toLowerCase() === connectedWallet.toLowerCase())) {
+    if (
+      recipients.some(
+        (r) => r.address.toLowerCase() === connectedWallet.toLowerCase(),
+      )
+    ) {
       return "Your wallet cannot be a recipient";
     }
 
@@ -382,7 +401,7 @@ export default function MeshPaymentsPage() {
 
         for (const line of lines) {
           if (line.startsWith("data: ")) {
-            const data = JSON.parse(line.slice(6)) as { 
+            const data = JSON.parse(line.slice(6)) as {
               transaction?: Transaction;
               needsSignature?: boolean;
               paymentData?: {
@@ -391,11 +410,13 @@ export default function MeshPaymentsPage() {
                 amount: string;
               };
             };
-            
+
             if (data.transaction) {
               // Update existing transaction or add new one
               setTransactions((prev) => {
-                const existingIndex = prev.findIndex(t => t.id === data.transaction!.id);
+                const existingIndex = prev.findIndex(
+                  (t) => t.id === data.transaction!.id,
+                );
                 if (existingIndex >= 0) {
                   // Update existing transaction
                   const updated = [...prev];
@@ -407,23 +428,23 @@ export default function MeshPaymentsPage() {
                 }
               });
             }
-            
+
             // If signature needed, process real payment
             if (data.needsSignature && data.paymentData && data.transaction) {
               const txId = data.transaction.id;
-              
+
               // Update to signing status
               setTransactions((prev) =>
                 prev.map((t) =>
-                  t.id === txId ? { ...t, status: "signing" } : t
-                )
+                  t.id === txId ? { ...t, status: "signing" } : t,
+                ),
               );
 
               // Process the real payment
               const result = await processRealPayment(
                 data.paymentData.to,
                 data.paymentData.token,
-                data.paymentData.amount
+                data.paymentData.amount,
               );
 
               // Update based on result
@@ -432,16 +453,16 @@ export default function MeshPaymentsPage() {
                   prev.map((t) =>
                     t.id === txId
                       ? { ...t, status: "success", txHash: result.txHash }
-                      : t
-                  )
+                      : t,
+                  ),
                 );
               } else {
                 setTransactions((prev) =>
                   prev.map((t) =>
                     t.id === txId
                       ? { ...t, status: "error", error: result.error }
-                      : t
-                  )
+                      : t,
+                  ),
                 );
               }
             }
@@ -451,7 +472,7 @@ export default function MeshPaymentsPage() {
     } catch (error) {
       console.error("Mesh distribution error:", error);
       alert(
-        error instanceof Error ? error.message : "An unknown error occurred"
+        error instanceof Error ? error.message : "An unknown error occurred",
       );
     } finally {
       setIsRunning(false);
@@ -485,7 +506,12 @@ export default function MeshPaymentsPage() {
         );
       case "error":
         return (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -496,11 +522,7 @@ export default function MeshPaymentsPage() {
         );
       case "processing":
         return (
-          <svg
-            className="h-5 w-5 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
               cx="12"
@@ -518,7 +540,12 @@ export default function MeshPaymentsPage() {
         );
       default:
         return (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -530,7 +557,9 @@ export default function MeshPaymentsPage() {
     }
   };
 
-  const successCount = transactions.filter((t) => t.status === "success").length;
+  const successCount = transactions.filter(
+    (t) => t.status === "success",
+  ).length;
   const errorCount = transactions.filter((t) => t.status === "error").length;
 
   return (
@@ -580,8 +609,9 @@ export default function MeshPaymentsPage() {
           </h1>
 
           <p className="max-w-3xl text-xl text-gray-300">
-            Create a dynamic transaction network where all wallets exchange tokens
-            with each other randomly, demonstrating X402&apos;s peer-to-peer capabilities.
+            Create a dynamic transaction network where all wallets exchange
+            tokens with each other randomly, demonstrating X402&apos;s
+            peer-to-peer capabilities.
           </p>
         </header>
 
@@ -589,41 +619,42 @@ export default function MeshPaymentsPage() {
           {/* Configuration Panel */}
           <div className="space-y-6">
             <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800/90 to-slate-900/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-          <h2 className="mb-6 text-2xl font-bold text-white">
-            Configuration
-          </h2>
+              <h2 className="mb-6 text-2xl font-bold text-white">
+                Configuration
+              </h2>
 
-          {/* Wallet Connection */}
-          <div className="mb-6">
-            <label className="mb-3 block text-sm font-semibold text-white">
-              Your Wallet (Sender)
-            </label>
-            {!connectedWallet ? (
-              <button
-                onClick={connectWallet}
-                disabled={isConnecting || isRunning}
-                className="w-full rounded-lg bg-gradient-to-r from-red-500 to-rose-500 px-4 py-3 font-semibold text-white transition-all hover:from-red-400 hover:to-rose-400 disabled:opacity-50"
-              >
-                {isConnecting ? "Connecting..." : "Connect MetaMask"}
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-                <span className="flex-1 font-mono text-sm text-emerald-300">
-                  {connectedWallet.slice(0, 6)}...{connectedWallet.slice(-4)}
-                </span>
-                <button
-                  onClick={disconnectWallet}
-                  disabled={isRunning}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
-                >
-                  Disconnect
-                </button>
+              {/* Wallet Connection */}
+              <div className="mb-6">
+                <label className="mb-3 block text-sm font-semibold text-white">
+                  Your Wallet (Sender)
+                </label>
+                {!connectedWallet ? (
+                  <button
+                    onClick={connectWallet}
+                    disabled={isConnecting || isRunning}
+                    className="w-full rounded-lg bg-gradient-to-r from-red-500 to-rose-500 px-4 py-3 font-semibold text-white transition-all hover:from-red-400 hover:to-rose-400 disabled:opacity-50"
+                  >
+                    {isConnecting ? "Connecting..." : "Connect MetaMask"}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                    <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+                    <span className="flex-1 font-mono text-sm text-emerald-300">
+                      {connectedWallet.slice(0, 6)}...
+                      {connectedWallet.slice(-4)}
+                    </span>
+                    <button
+                      onClick={disconnectWallet}
+                      disabled={isRunning}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Recipients Section */}
+              {/* Recipients Section */}
               <div className="mb-6">
                 <label className="mb-3 flex items-center justify-between text-sm font-semibold text-white">
                   <span>Recipients (minimum 1)</span>
@@ -647,7 +678,7 @@ export default function MeshPaymentsPage() {
                           }
                           disabled={isRunning}
                           placeholder={`Recipient ${index + 1} address (0x...)`}
-                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-50"
+                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none disabled:opacity-50"
                         />
                       </div>
                       {recipients.length > 1 && (
@@ -712,7 +743,7 @@ export default function MeshPaymentsPage() {
                     disabled={isRunning}
                     step="0.01"
                     min="0.01"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-50"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none disabled:opacity-50"
                   />
                 </div>
                 <div>
@@ -726,7 +757,7 @@ export default function MeshPaymentsPage() {
                     disabled={isRunning}
                     step="0.01"
                     min="0.01"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-50"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -745,7 +776,7 @@ export default function MeshPaymentsPage() {
                   disabled={isRunning}
                   min="1"
                   max="100"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-50"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none disabled:opacity-50"
                 />
               </div>
 
@@ -924,7 +955,8 @@ export default function MeshPaymentsPage() {
             <div className="rounded-xl border border-white/5 bg-white/5 p-4">
               <div className="mb-2 text-red-400">1. Connect Wallet</div>
               <p className="text-sm text-gray-400">
-                Connect your MetaMask wallet - this will be the sender for all transactions
+                Connect your MetaMask wallet - this will be the sender for all
+                transactions
               </p>
             </div>
             <div className="rounded-xl border border-white/5 bg-white/5 p-4">
@@ -946,7 +978,7 @@ export default function MeshPaymentsPage() {
               </p>
             </div>
           </div>
-          
+
           <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
             <div className="flex gap-3">
               <div className="flex-shrink-0">
@@ -965,13 +997,14 @@ export default function MeshPaymentsPage() {
                 </svg>
               </div>
               <div>
-                <h4 className="font-semibold text-emerald-300 mb-1">
+                <h4 className="mb-1 font-semibold text-emerald-300">
                   ✓ Real Blockchain Transactions
                 </h4>
-                <p className="text-sm text-emerald-200/80 leading-relaxed">
-                  This feature uses actual X402 protocol for gasless USDC transfers on Avalanche. 
-                  You&apos;ll sign real EIP-712 messages and transactions will be processed on-chain.
-                  Make sure you have sufficient USDC balance!
+                <p className="text-sm leading-relaxed text-emerald-200/80">
+                  This feature uses actual X402 protocol for gasless USDC
+                  transfers on Avalanche. You&apos;ll sign real EIP-712 messages
+                  and transactions will be processed on-chain. Make sure you
+                  have sufficient USDC balance!
                 </p>
               </div>
             </div>
@@ -986,10 +1019,11 @@ export default function MeshPaymentsPage() {
 declare global {
   interface Window {
     ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      request: (args: {
+        method: string;
+        params?: unknown[];
+      }) => Promise<unknown>;
       isMetaMask?: boolean;
     };
   }
 }
-
-
