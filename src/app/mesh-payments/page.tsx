@@ -271,14 +271,14 @@ export default function MeshPaymentsPage() {
 
       console.log("X402 facilitator response:", result);
 
-      if (result.txHash || result.valid) {
+      if (result.txHash ?? result.valid) {
         return { 
           success: true, 
-          txHash: result.txHash || "0x" + "pending".padEnd(64, "0")
+          txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0")
         };
       } else {
         throw new Error(
-          result.error || result.message || "Payment verification failed"
+          result.error ?? result.message ?? "Payment verification failed"
         );
       }
     } catch (error) {
