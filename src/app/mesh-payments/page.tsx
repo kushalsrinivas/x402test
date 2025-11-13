@@ -120,7 +120,12 @@ export default function MeshPaymentsPage() {
     to: string,
     token: string,
     amount: string,
-  ): Promise<{ success: boolean; txHash?: string; payer?: string; error?: string | object }> {
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    payer?: string;
+    error?: string | object;
+  }> {
     try {
       if (typeof window.ethereum === "undefined") {
         throw new Error("MetaMask not installed");
@@ -487,7 +492,12 @@ export default function MeshPaymentsPage() {
                 setTransactions((prev) =>
                   prev.map((t) =>
                     t.id === txId
-                      ? { ...t, status: "success", txHash: result.txHash, payer: result.payer }
+                      ? {
+                          ...t,
+                          status: "success",
+                          txHash: result.txHash,
+                          payer: result.payer,
+                        }
                       : t,
                   ),
                 );

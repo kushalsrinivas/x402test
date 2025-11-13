@@ -88,47 +88,84 @@ export async function POST(request: NextRequest) {
       network: payload.network,
     });
 
-    // Import x402 verify function and viem dynamically
-    const { verify } = await import('x402/facilitator');
-    const { createPublicClient, http } = await import('viem');
-    const { avalanche } = await import('viem/chains');
+    // Use 0xGasless facilitator service to verify and settle the payment
+    const facilitatorUrl = process.env.FACILITATOR_URL ?? 'https://x402.0xgasless.com/';
+    
+    console.log("Sending payment to 0xGasless facilitator:", facilitatorUrl);
 
-    // Create viem client for Avalanche C-Chain
-    const client = createPublicClient({
-      chain: avalanche,
-      transport: http('https://api.avax.network/ext/bc/C/rpc'),
-    });
+    try {
+      // Send the payment to 0xGasless facilitator for verification and settlement
+      // 0xGasless handles both verification and on-chain settlement automatically
+      const facilitatorResponse = await fetch(facilitatorUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payload: payload,
+          requirements: paymentRequirements,
+        }),
+      });
 
-    // Verify the payment using x402 package
-    const verifyResponse = await verify(
+      if (!facilitatorResponse.ok) {
+        const errorText = await facilitatorResponse.text();
+        console.error("0xGasless facilitator error:", {
+          status: facilitatorResponse.status,
+          statusText: facilitatorResponse.statusText,
+          body: errorText,
+        });
 
-      client,
-      payload,
-      paymentRequirements
-    );
+        return NextResponse.json(
+          {
+            error: "Facilitator processing failed",
+            reason: `0xGasless returned ${facilitatorResponse.status}: ${errorText}`,
+          },
+          { status: facilitatorResponse.status }
+        );
+      }
 
-    console.log("x402 verify response:", {
-      isValid: verifyResponse.isValid,
-      invalidReason: verifyResponse.invalidReason,
-      payer: verifyResponse.payer,
-    });
+      const facilitatorResult = (await facilitatorResponse.json()) as {
+        success?: boolean;
+        isValid?: boolean;
+        txHash?: string;
+        transaction?: string;
+        payer?: string;
+        error?: string;
+        message?: string;
+      };
 
-    if (!verifyResponse.isValid) {
+      console.log("0xGasless facilitator response:", facilitatorResult);
+
+      // Check if payment was successful
+      if (facilitatorResult.success || facilitatorResult.isValid) {
+        // Extract transaction hash (might be in txHash or transaction field)
+        const txHash = facilitatorResult.txHash ?? facilitatorResult.transaction;
+        
+        return NextResponse.json({
+          success: true,
+          isValid: true,
+          payer: facilitatorResult.payer,
+          txHash: txHash,
+        });
+      } else {
+        return NextResponse.json(
+          {
+            error: "Payment verification failed",
+            reason: facilitatorResult.error ?? facilitatorResult.message ?? "Unknown error from facilitator",
+          },
+          { status: 402 }
+        );
+      }
+    } catch (facilitatorError) {
+      console.error("Error communicating with 0xGasless facilitator:", facilitatorError);
       return NextResponse.json(
         {
-          error: "Payment verification failed",
-          reason: verifyResponse.invalidReason ?? "Unknown verification error",
+          error: "Facilitator communication failed",
+          reason: facilitatorError instanceof Error ? facilitatorError.message : "Unable to reach facilitator service",
         },
-        { status: 402 }
+        { status: 500 }
       );
     }
-
-    // Payment verified successfully
-    return NextResponse.json({
-      success: true,
-      isValid: verifyResponse.isValid,
-      payer: verifyResponse.payer,
-    });
   } catch (error) {
     console.error("Payment processing error:", error);
     return NextResponse.json(
