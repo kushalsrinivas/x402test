@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BrowserProvider } from "ethers";
+import { ErrorDisplay } from "~/components/ErrorDisplay";
 
 interface Recipient {
   id: string;
@@ -23,7 +24,7 @@ interface Transaction {
   status: "pending" | "signing" | "processing" | "success" | "error";
   timestamp: number;
   txHash?: string;
-  error?: string;
+  error?: string | object;
 }
 
 export default function MeshPaymentsPage() {
@@ -117,7 +118,7 @@ export default function MeshPaymentsPage() {
     to: string,
     token: string,
     amount: string,
-  ): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  ): Promise<{ success: boolean; txHash?: string; error?: string | object }> {
     try {
       if (typeof window.ethereum === "undefined") {
         throw new Error("MetaMask not installed");
@@ -263,11 +264,30 @@ export default function MeshPaymentsPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Facilitator error:", response.status, errorText);
-        throw new Error(
-          `Facilitator returned ${response.status}: ${errorText || "Unknown error"}`,
-        );
+        let errorData: unknown;
+        const contentType = response.headers.get("content-type");
+        
+        try {
+          if (contentType?.includes("application/json")) {
+            errorData = await response.json();
+          } else {
+            errorData = await response.text();
+          }
+        } catch {
+          errorData = "Failed to parse error response";
+        }
+        
+        console.error("Facilitator error:", response.status, errorData);
+        
+        return {
+          success: false,
+          error: {
+            status: response.status,
+            statusText: response.statusText,
+            data: errorData,
+            message: `Facilitator returned ${response.status}: ${response.statusText}`,
+          },
+        };
       }
 
       const result = (await response.json()) as {
@@ -275,6 +295,7 @@ export default function MeshPaymentsPage() {
         error?: string;
         valid?: boolean;
         message?: string;
+        reason?: string;
       };
 
       console.log("X402 facilitator response:", result);
@@ -285,15 +306,23 @@ export default function MeshPaymentsPage() {
           txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0"),
         };
       } else {
-        throw new Error(
-          result.error ?? result.message ?? "Payment verification failed",
-        );
+        return {
+          success: false,
+          error: {
+            message: result.error ?? result.message ?? "Payment verification failed",
+            reason: result.reason,
+            fullResponse: result,
+          },
+        };
       }
     } catch (error) {
       console.error("Real payment error:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: {
+          message: error instanceof Error ? error.message : "Unknown error",
+          error: error,
+        },
       };
     }
   }
@@ -936,8 +965,8 @@ export default function MeshPaymentsPage() {
                         </div>
                       )}
                       {tx.error && (
-                        <div className="mt-2 text-xs opacity-75">
-                          Error: {tx.error}
+                        <div className="mt-2">
+                          <ErrorDisplay error={tx.error} />
                         </div>
                       )}
                     </div>
