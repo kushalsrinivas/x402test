@@ -291,16 +291,18 @@ export default function MeshPaymentsPage() {
       }
 
       const result = (await response.json()) as {
+        success?: boolean;
+        isValid?: boolean;
         txHash?: string;
+        payer?: string;
         error?: string;
-        valid?: boolean;
         message?: string;
         reason?: string;
       };
 
       console.log("X402 facilitator response:", result);
 
-      if (result.txHash ?? result.valid) {
+      if (result.success && result.isValid) {
         return {
           success: true,
           txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0"),
