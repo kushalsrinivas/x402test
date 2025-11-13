@@ -158,15 +158,13 @@ export function MeshPaymentProcessor({
         s,
       };
 
-      // Send to X402 facilitator for processing
-      const facilitatorUrl = process.env.NEXT_PUBLIC_FACILITATOR_URL ?? 'https://x402.org/facilitator';
-      const response = await fetch(facilitatorUrl, {
+      // Send to X402 facilitator via our proxy endpoint (avoids CORS issues)
+      const response = await fetch('/api/process-x402-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type: 'processPayment',
           payload: paymentPayload,
         }),
       });

@@ -231,25 +231,20 @@ export default function MeshPaymentsPage() {
         s,
       };
 
-      // Send to X402 facilitator
-      const facilitatorUrl =
-        process.env.NEXT_PUBLIC_FACILITATOR_URL ?? "https://x402.org/facilitator";
-      
+      // Send to X402 facilitator via our proxy endpoint (avoids CORS issues)
       console.log("Sending payment to X402 facilitator:", {
-        facilitatorUrl,
         from: userAddress,
         to,
         amount,
         token,
       });
 
-      const response = await fetch(facilitatorUrl, {
+      const response = await fetch("/api/process-x402-payment", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          type: "processPayment",
           payload: paymentPayload,
         }),
       });
