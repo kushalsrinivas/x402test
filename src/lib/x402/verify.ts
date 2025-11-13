@@ -17,10 +17,9 @@ type X402VerifyResponse = {
 };
 
 // Viem client type (simplified for x402 compatibility)
-type ViemClient = {
+type ViemClient = Record<string, unknown> & {
   chain?: unknown;
   transport?: unknown;
-  [key: string]: unknown;
 };
 
 // x402 payment requirements type
@@ -37,9 +36,7 @@ type X402PaymentRequirements = {
 };
 
 // x402 config type
-type X402VerifyConfig = {
-  [key: string]: unknown;
-};
+type X402VerifyConfig = Record<string, unknown>;
 
 type VerifyFunction = (
   client: ViemClient,
