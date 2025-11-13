@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BrowserProvider } from "ethers";
 import { ErrorDisplay } from "~/components/ErrorDisplay";
+import { TransactionDetails } from "~/components/TransactionDetails";
 
 interface Recipient {
   id: string;
@@ -24,6 +25,7 @@ interface Transaction {
   status: "pending" | "signing" | "processing" | "success" | "error";
   timestamp: number;
   txHash?: string;
+  payer?: string;
   error?: string | object;
 }
 
@@ -118,7 +120,7 @@ export default function MeshPaymentsPage() {
     to: string,
     token: string,
     amount: string,
-  ): Promise<{ success: boolean; txHash?: string; error?: string | object }> {
+  ): Promise<{ success: boolean; txHash?: string; payer?: string; error?: string | object }> {
     try {
       if (typeof window.ethereum === "undefined") {
         throw new Error("MetaMask not installed");
@@ -306,6 +308,7 @@ export default function MeshPaymentsPage() {
         return {
           success: true,
           txHash: result.txHash ?? "0x" + "pending".padEnd(64, "0"),
+          payer: result.payer,
         };
       } else {
         return {
@@ -484,7 +487,7 @@ export default function MeshPaymentsPage() {
                 setTransactions((prev) =>
                   prev.map((t) =>
                     t.id === txId
-                      ? { ...t, status: "success", txHash: result.txHash }
+                      ? { ...t, status: "success", txHash: result.txHash, payer: result.payer }
                       : t,
                   ),
                 );
@@ -962,10 +965,8 @@ export default function MeshPaymentsPage() {
                         <span className="font-semibold">{tx.token}</span>
                         <span>${tx.amount}</span>
                       </div>
-                      {tx.txHash && (
-                        <div className="mt-2 font-mono text-xs opacity-75">
-                          Tx: {tx.txHash.slice(0, 10)}...{tx.txHash.slice(-8)}
-                        </div>
+                      {tx.status === "success" && (
+                        <TransactionDetails transaction={tx} />
                       )}
                       {tx.error && (
                         <div className="mt-2">
