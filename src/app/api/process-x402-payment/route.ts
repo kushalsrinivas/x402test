@@ -89,14 +89,20 @@ export async function POST(request: NextRequest) {
     });
 
     // Use 0xGasless facilitator service to verify and settle the payment
-    const facilitatorUrl = process.env.FACILITATOR_URL ?? 'https://x402.0xgasless.com/';
+    const facilitatorBaseUrl = process.env.FACILITATOR_URL ?? 'https://x402.0xgasless.com';
+    // Remove trailing slash if present
+    const baseUrl = facilitatorBaseUrl.endsWith('/') 
+      ? facilitatorBaseUrl.slice(0, -1) 
+      : facilitatorBaseUrl;
     
-    console.log("Sending payment to 0xGasless facilitator:", facilitatorUrl);
+    console.log("Using 0xGasless facilitator:", baseUrl);
 
     try {
-      // Send the payment to 0xGasless facilitator for verification and settlement
-      // 0xGasless handles both verification and on-chain settlement automatically
-      const facilitatorResponse = await fetch(facilitatorUrl, {
+      // Step 1: Verify the payment with 0xGasless
+      console.log("Step 1: Verifying payment...");
+      const verifyUrl = `${baseUrl}/verify`;
+      
+      const verifyResponse = await fetch(verifyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,53 +113,101 @@ export async function POST(request: NextRequest) {
         }),
       });
 
-      if (!facilitatorResponse.ok) {
-        const errorText = await facilitatorResponse.text();
-        console.error("0xGasless facilitator error:", {
-          status: facilitatorResponse.status,
-          statusText: facilitatorResponse.statusText,
+      if (!verifyResponse.ok) {
+        const errorText = await verifyResponse.text();
+        console.error("0xGasless verification error:", {
+          status: verifyResponse.status,
+          statusText: verifyResponse.statusText,
           body: errorText,
         });
 
         return NextResponse.json(
           {
-            error: "Facilitator processing failed",
-            reason: `0xGasless returned ${facilitatorResponse.status}: ${errorText}`,
+            error: "Payment verification failed",
+            reason: `0xGasless verify returned ${verifyResponse.status}: ${errorText}`,
           },
-          { status: facilitatorResponse.status }
+          { status: verifyResponse.status }
         );
       }
 
-      const facilitatorResult = (await facilitatorResponse.json()) as {
-        success?: boolean;
+      const verifyResult = (await verifyResponse.json()) as {
         isValid?: boolean;
-        txHash?: string;
-        transaction?: string;
         payer?: string;
+        invalidReason?: string;
         error?: string;
-        message?: string;
       };
 
-      console.log("0xGasless facilitator response:", facilitatorResult);
+      console.log("0xGasless verify response:", verifyResult);
 
-      // Check if payment was successful
-      if (facilitatorResult.success || facilitatorResult.isValid) {
-        // Extract transaction hash (might be in txHash or transaction field)
-        const txHash = facilitatorResult.txHash ?? facilitatorResult.transaction;
+      if (!verifyResult.isValid) {
+        return NextResponse.json(
+          {
+            error: "Payment verification failed",
+            reason: verifyResult.invalidReason ?? verifyResult.error ?? "Payment signature invalid",
+          },
+          { status: 402 }
+        );
+      }
+
+      // Step 2: Settle the payment with 0xGasless
+      console.log("Step 2: Settling payment on-chain...");
+      const settleUrl = `${baseUrl}/settle`;
+
+      const settleResponse = await fetch(settleUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payload: payload,
+          requirements: paymentRequirements,
+        }),
+      });
+
+      if (!settleResponse.ok) {
+        const errorText = await settleResponse.text();
+        console.error("0xGasless settlement error:", {
+          status: settleResponse.status,
+          statusText: settleResponse.statusText,
+          body: errorText,
+        });
+
+        return NextResponse.json(
+          {
+            error: "Payment settlement failed",
+            reason: `0xGasless settle returned ${settleResponse.status}: ${errorText}`,
+          },
+          { status: settleResponse.status }
+        );
+      }
+
+      const settleResult = (await settleResponse.json()) as {
+        success?: boolean;
+        transaction?: string;
+        txHash?: string;
+        error?: string;
+        errorReason?: string;
+      };
+
+      console.log("0xGasless settle response:", settleResult);
+
+      if (settleResult.success && (settleResult.transaction || settleResult.txHash)) {
+        // Extract transaction hash
+        const txHash = settleResult.transaction ?? settleResult.txHash;
         
         return NextResponse.json({
           success: true,
           isValid: true,
-          payer: facilitatorResult.payer,
+          payer: verifyResult.payer,
           txHash: txHash,
         });
       } else {
         return NextResponse.json(
           {
-            error: "Payment verification failed",
-            reason: facilitatorResult.error ?? facilitatorResult.message ?? "Unknown error from facilitator",
+            error: "Payment settlement failed",
+            reason: settleResult.errorReason ?? settleResult.error ?? "Failed to submit transaction on-chain",
           },
-          { status: 402 }
+          { status: 500 }
         );
       }
     } catch (facilitatorError) {
