@@ -266,7 +266,7 @@ export default function MeshPaymentsPage() {
       if (!response.ok) {
         let errorData: unknown;
         const contentType = response.headers.get("content-type");
-        
+
         try {
           if (contentType?.includes("application/json")) {
             errorData = await response.json();
@@ -276,9 +276,9 @@ export default function MeshPaymentsPage() {
         } catch {
           errorData = "Failed to parse error response";
         }
-        
+
         console.error("Facilitator error:", response.status, errorData);
-        
+
         return {
           success: false,
           error: {
@@ -309,7 +309,8 @@ export default function MeshPaymentsPage() {
         return {
           success: false,
           error: {
-            message: result.error ?? result.message ?? "Payment verification failed",
+            message:
+              result.error ?? result.message ?? "Payment verification failed",
             reason: result.reason,
             fullResponse: result,
           },
