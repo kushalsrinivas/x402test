@@ -58,7 +58,8 @@ export function X402PaymentClient({
       // Get payment info from server
       const paymentInfoResponse = await fetch('/api/payment-info');
       if (!paymentInfoResponse.ok) {
-        throw new Error('Failed to fetch payment information');
+        const errorData = await paymentInfoResponse.json().catch(() => ({})) as { error?: string };
+        throw new Error(errorData.error ?? 'Failed to fetch payment information');
       }
 
       const paymentInfo = await paymentInfoResponse.json() as {
@@ -72,6 +73,11 @@ export function X402PaymentClient({
         };
       };
       const { walletAddress, paymentAmount, networkConfig } = paymentInfo;
+
+      // Validate network configuration
+      if (!networkConfig || !networkConfig.chainId) {
+        throw new Error('Invalid network configuration received from server. Please check your environment variables.');
+      }
 
       // Connect to wallet
       const provider = new BrowserProvider(window.ethereum);

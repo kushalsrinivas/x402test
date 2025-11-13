@@ -12,6 +12,17 @@ export async function GET() {
   
   const networkConfig = NETWORKS[network];
 
+  // Validate that network configuration exists
+  if (!networkConfig) {
+    return NextResponse.json(
+      { 
+        error: `Invalid network configuration for: ${network}`,
+        availableNetworks: Object.keys(NETWORKS)
+      },
+      { status: 500 }
+    );
+  }
+
   return NextResponse.json({
     walletAddress,
     paymentAmount,
