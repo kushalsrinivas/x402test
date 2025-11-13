@@ -108,8 +108,8 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          payload: payload,
-          requirements: paymentRequirements,
+          paymentPayload: payload,
+          paymentRequirements: paymentRequirements,
         }),
       });
 
@@ -159,8 +159,8 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          payload: payload,
-          requirements: paymentRequirements,
+          paymentPayload: payload,
+          paymentRequirements: paymentRequirements,
         }),
       });
 
